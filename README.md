@@ -1,5 +1,7 @@
 # eportal-moodle-skill
 
+![eportal-moodle-skill: your assignments, for your agent](docs/cover.jpg)
+
 Ask your AI agent *"what do I still have to hand in this week?"* and it answers from your
 Moodle. It sees deadlines, your submission status, assignment briefs, lecture materials,
 announcements, forums, grades and the calendar, through the web service the official Moodle app
