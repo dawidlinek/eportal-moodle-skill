@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+.venv/
+# local test output and mirrors
+/out/
+*.part
+.moodle-sync.json
