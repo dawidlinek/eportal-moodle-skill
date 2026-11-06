@@ -30,7 +30,8 @@ command line tool.
   [Obsidian](https://obsidian.md) vault (`--obsidian`).
 - **Optional writes, with a person in the loop.** Submit an assignment, post or reply in a forum,
   answer a choice, or tick an activity done. These are off until you enable them yourself, and
-  every write is previewed and needs a confirmation code (see [Safety](#safety)).
+  every write is previewed and needs a confirmation code
+  ([how writes work](skills/moodle/references/writes.md)).
 
 ## Install
 
@@ -104,55 +105,6 @@ Every command prints Markdown, or JSON with `--json`:
 | `submit`, `post`, `reply`, `choose`, `complete` | writes, opt-in and previewed |
 
 The [command reference](skills/moodle/references/commands.md) has every option.
-
-## Safety
-
-A Moodle token can do anything you can do in the app, so the tool is careful with it.
-
-- **Read-only by default.** All reads pass a guard that refuses any function that is not a pure
-  read. That includes the `…_view_…` functions, which would mark activities as viewed or
-  complete. `call` goes through the same guard.
-- **Writes need three things.** First, you enable them per site, by typing the site's name at an
-  interactive terminal; agents cannot do that. Second, a preview: the command shows exactly what
-  it would send and sends nothing. Third, a confirmation code that matches that exact action,
-  including a hash of every file. If anything changes after the preview, the code no longer
-  works. The skill tells the agent to show you the preview and wait for your yes.
-- **The token stays put.** It is stored in `~/.config/moodle-skill/tokens/`, readable only by
-  you. It is never printed, never written into notes or links, and redacted from errors and
-  JSON. After an SSO login, Moodle's extra *private token* is thrown away. `logout` deletes it,
-  and the reference explains how to reset it on the site.
-- **Course content is treated as untrusted.** Teachers and other students write it. The output
-  marks such text as information, not instructions, and the skill tells the agent never to act
-  on instructions found in it. One of the tests plants such an instruction in a forum post.
-- **It only talks to your Moodle.** No telemetry, no third-party services, no dependencies.
-- **Your files are safe.** `sync` and `download` keep a manifest and only ever replace what they
-  wrote. Your own notes, annotated PDFs and edited notes are kept. Names coming from Moodle are
-  sanitised, so a file can never land outside the target folder.
-
-Reading a course updates your *last access* time in Moodle, just as opening it in the app does.
-
-## Tests
-
-```bash
-python3 -m unittest discover tests     # unit tests and a fake Moodle; any OS, Python 3.9+
-```
-
-- [`tests/test_moodle.py`](tests/test_moodle.py) has unit tests (HTML to Markdown, file names,
-  SSO token decoding and signatures, the read-only guard against 60+ real write functions,
-  confirmation codes), plus every command run against a [fake Moodle](tests/fake_moodle.py).
-  The CLI tests check which functions each command called, that no read command writes, that
-  the token never appears in output or files, that re-syncs are idempotent and keep your edits,
-  and that a write cannot be sent without the matching code.
-- [`tests/integration/`](tests/integration) builds a throwaway Moodle 5.0 in Docker, seeded with
-  fictional courses. `run_tests.py` drives the real logins through a terminal (password, and SSO
-  through `launch.php`), runs every command, and checks every write from the teacher's side.
-- It was also run read-only against PWr ePortal (Moodle 4.5.4, single sign-on). Every read
-  command and a full `sync` (8 courses, 24 files) worked, the second sync changed nothing, and no
-  output contained the token. Compared with an earlier ePortal-only script on the same data, it
-  found the same 25 activities with the same due dates. The only difference is deliberate: two
-  assignments that were graded without an online submission now count as done.
-
-CI runs the first set on Linux, macOS and Windows.
 
 ## License
 
