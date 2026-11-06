@@ -1,0 +1,37 @@
+# Disposable Moodle 5.0 integration-test site. See README.md.
+# Fixed project name so it never collides with other stacks on the host.
+name: moodle-it
+
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: moodle
+      POSTGRES_USER: moodle
+      POSTGRES_PASSWORD: ${MOODLE_DB_PASSWORD:?run ./setup.sh, it generates .env}
+    volumes:
+      - dbdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U moodle -d moodle"]
+      interval: 2s
+      timeout: 5s
+      retries: 60
+    # No published port: only the web container can reach the database.
+
+  web:
+    image: moodlehq/moodle-php-apache:8.3
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      # Loopback only. Never reachable from the LAN.
+      - "127.0.0.1:${MOODLE_PORT:-8099}:80"
+    volumes:
+      - ./moodle:/var/www/html
+      - moodledata:/var/www/moodledata
+      - ./configure.php:/opt/moodle-it/configure.php:ro
+      - ./seed.php:/opt/moodle-it/seed.php:ro
+
+volumes:
+  dbdata:
+  moodledata:
