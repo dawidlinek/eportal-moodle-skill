@@ -43,8 +43,7 @@ Every read goes through one function that refuses anything that is not a read:
   `mod_quiz_get_attempt_data` can move an attempt in progress to another page.
 
 Writes go through a second function. It accepts only the six functions behind the write
-commands, and only during a confirmed preview. The tests check the guard against more than 60
-real write functions, and check that no read command ever calls anything else.
+commands, and only during a confirmed preview.
 
 ## Versions
 
@@ -52,8 +51,8 @@ The script is built against the web service API of Moodle 3.9 to 5.x. Where newe
 missing, it falls back to older ones. It has been run against:
 
 - Moodle 4.5.4 (PWr ePortal, single sign-on): every read command, read-only.
-- Moodle 5.0.10 in Docker (`tests/integration/`): every command, including password and SSO
-  login and every write.
+- Moodle 5.0.10 (a disposable test site): every command, including password and SSO login and
+  every write.
 
 ## Raw calls
 
