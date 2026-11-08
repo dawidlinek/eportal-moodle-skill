@@ -29,6 +29,7 @@ import re
 import secrets
 import shlex
 import shutil
+import ssl
 import sys
 import time
 import traceback
@@ -40,7 +41,7 @@ import uuid
 from html.parser import HTMLParser
 from pathlib import Path
 
-VERSION = "0.1.0"
+VERSION = "0.2.1"
 SERVICE = "moodle_mobile_app"
 REPO = "https://github.com/dawidlinek/eportal-moodle-skill"
 UA = f"moodle-skill/{VERSION} (+{REPO})"
@@ -496,6 +497,51 @@ def open_site(args) -> "Client":
 
 # =============================================================================== client
 
+# Where operating systems keep their CA bundle, for Pythons that ship without one.
+CA_BUNDLES = (
+    "/etc/ssl/cert.pem",                            # macOS (kept up to date by Apple), Alpine, BSD
+    "/opt/homebrew/etc/ca-certificates/cert.pem",   # Homebrew on Apple silicon
+    "/usr/local/etc/ca-certificates/cert.pem",      # Homebrew on Intel
+    "/etc/ssl/certs/ca-certificates.crt",           # Debian, Ubuntu, Arch
+    "/etc/pki/tls/certs/ca-bundle.crt",             # Fedora, RHEL
+    "/etc/ssl/ca-bundle.pem",                       # openSUSE
+)
+_SSL = None
+CERT_HINT = ("this Python cannot verify HTTPS certificates. That is common with Python installed "
+             "by uv, or from python.org on macOS. Fix it once with one of: `pip install certifi`; "
+             "`export SSL_CERT_FILE=/etc/ssl/cert.pem` (macOS) in your shell profile; or run "
+             "'Install Certificates.command' from the Python folder. Verification stays on.")
+
+
+def ssl_context() -> ssl.SSLContext:
+    """A verifying TLS context. Some Pythons (uv's builds, python.org's on macOS before
+    'Install Certificates') find no CA bundle at all, so every site fails as 'self-signed
+    certificate in certificate chain'. Then use certifi or the operating system's bundle."""
+    global _SSL
+    if _SSL is not None:
+        return _SSL
+    ctx = _SSL = ssl.create_default_context()
+    if sys.platform == "win32" or os.environ.get("SSL_CERT_FILE") or os.environ.get("SSL_CERT_DIR"):
+        return ctx                     # Windows uses its own store; an explicit choice wins
+    paths = ssl.get_default_verify_paths()
+    if paths.cafile or (paths.capath and any(os.scandir(paths.capath))):
+        return ctx                     # this Python has a CA bundle
+    try:
+        import certifi
+        ctx.load_verify_locations(certifi.where())
+        return ctx
+    except (ImportError, OSError, ssl.SSLError):
+        pass
+    for bundle in CA_BUNDLES:
+        if os.path.isfile(bundle):
+            try:
+                ctx.load_verify_locations(bundle)
+                return ctx
+            except (OSError, ssl.SSLError):
+                continue
+    return ctx
+
+
 def _http(url, data: bytes | None, ctype: str | None, timeout=90, retries=2, accept="application/json") -> bytes:
     headers = {"User-Agent": UA, "Accept": accept}
     if ctype:
@@ -504,7 +550,7 @@ def _http(url, data: bytes | None, ctype: str | None, timeout=90, retries=2, acc
     host = urllib.parse.urlsplit(url).netloc
     for attempt in range(retries + 1):
         try:
-            with urllib.request.urlopen(req, timeout=timeout) as r:
+            with urllib.request.urlopen(req, timeout=timeout, context=ssl_context()) as r:
                 return r.read()
         except urllib.error.HTTPError as e:
             if e.code in (429, 502, 503, 504) and attempt < retries:
@@ -512,6 +558,9 @@ def _http(url, data: bytes | None, ctype: str | None, timeout=90, retries=2, acc
                 continue
             raise MoodleError(f"HTTP {e.code} {e.reason} from {host}", f"http{e.code}") from None
         except (urllib.error.URLError, TimeoutError, ConnectionError, OSError) as e:
+            if isinstance(getattr(e, "reason", e), ssl.SSLCertVerificationError):
+                raise MoodleError(f"certificate check failed for {host} "
+                                  f"({getattr(e, 'reason', e).verify_message}): {CERT_HINT}", "certificate") from None
             if attempt < retries:
                 time.sleep(1 + 3 * attempt)
                 continue
@@ -612,7 +661,7 @@ class Client:
         tmp = dest.with_name("." + dest.name + ".part")
         req = urllib.request.Request(self.file_url(fileurl), headers={"User-Agent": UA})
         try:
-            with urllib.request.urlopen(req, timeout=300) as r, open(tmp, "wb") as f:
+            with urllib.request.urlopen(req, timeout=300, context=ssl_context()) as r, open(tmp, "wb") as f:
                 first = r.read(65536)
                 if "json" in (r.headers.get("Content-Type") or "") and first.lstrip()[:1] == b"{":
                     rest = first + r.read()

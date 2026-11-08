@@ -60,6 +60,7 @@ where you are already logged in to ePortal. Afterwards, `status` shows your name
 | "issued for a different request" | The pasted address came from an older attempt. It still works if the site accepts it, but redoing step 3 is cleaner. |
 | `invalidtoken` later on | The token expired or was reset. Run `login` again. |
 | "only runs in an interactive terminal" | An agent tried to run `login`. The user must run it. |
+| `CERTIFICATE_VERIFY_FAILED` / "certificate check failed" | This Python has no CA certificates. That is common with Python installed by uv, or from python.org on macOS; curl and `/usr/bin/python3` still work. `moodle.py` falls back to `certifi` or the system bundle by itself; if that still fails, `pip install certifi`, or put `export SSL_CERT_FILE=/etc/ssl/cert.pem` in your shell profile (macOS). Never turn verification off. |
 
 ## Several sites
 

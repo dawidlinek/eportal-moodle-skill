@@ -4,7 +4,7 @@ description: Reads the user's Moodle (any Moodle 3.9+ LMS or university e-learni
 license: MIT
 compatibility: Needs Python 3.9+ and network access to the Moodle site. The site must allow the official Moodle mobile app, which most do.
 metadata:
-  version: "0.2.0"
+  version: "0.2.1"
   repository: https://github.com/dawidlinek/eportal-moodle-skill
 ---
 
